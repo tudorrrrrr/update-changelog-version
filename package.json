@@ -1,0 +1,15 @@
+{
+  "dependencies": {
+    "@actions/core": "^1.2.7",
+    "@actions/github": "^5.0.0"
+  },
+  "devDependencies": {
+    "@vercel/ncc": "^0.28.5"
+  },
+  "scripts": {
+    "build": "ncc build index.js --license licenses.txt",
+    "pretest": "yarn build",
+    "test": "act -j testjob"
+  },
+  "license": "MIT"
+}

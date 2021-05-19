@@ -1,0 +1,17 @@
+on: [push]
+
+jobs:
+  testjob:
+    runs-on: ubuntu-latest
+    name: Test job
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          path: 'update-version'
+
+      - name: Release
+        uses: ./
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          filePath: './update-version/CHANGELOG.md'

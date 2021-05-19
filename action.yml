@@ -1,0 +1,14 @@
+name: 'Update changelog version'
+description: 'Updates the changelog with the latest version and outputs commits in that release'
+inputs:
+  filePath:
+    description: 'Path to your changelog'
+    required: true
+outputs:
+  newTag:
+    description: 'New tag for the release'
+  changelog:
+    description: 'The changes for the newest release'
+runs:
+  using: 'node12'
+  main: 'dist/index.js'
