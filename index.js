@@ -2,6 +2,8 @@ const core = require('@actions/core')
 const fs = require('fs').promises
 
 const createNewTag = (previousTag) => {
+  if (!previousTag) return `${new Date().getFullYear()}.${new Date().getMonth() + 1}.1`
+
   const splitLatestTag = previousTag.split('.')
   const month = splitLatestTag[1]
   const release = splitLatestTag[2]

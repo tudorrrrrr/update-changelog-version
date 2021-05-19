@@ -462,6 +462,8 @@ const core = __nccwpck_require__(186)
 const fs = __nccwpck_require__(747).promises
 
 const createNewTag = (previousTag) => {
+  if (!previousTag) return `${new Date().getFullYear()}.${new Date().getMonth() + 1}.1`
+
   const splitLatestTag = previousTag.split('.')
   const month = splitLatestTag[1]
   const release = splitLatestTag[2]
