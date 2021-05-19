@@ -4,6 +4,8 @@ inputs:
   filePath:
     description: 'Path to your changelog'
     required: true
+  comparisonBranch:
+    description: 'Branch to compare to when checking what commits went into the release'
 outputs:
   newTag:
     description: 'New tag for the release'
