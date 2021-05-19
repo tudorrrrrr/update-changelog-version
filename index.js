@@ -24,13 +24,12 @@ const main = async () => {
       .find((l) => l.startsWith('## 20')) // works until the 22nd century
 
     const latestTag = createNewTag(previousTag)
-    changelogContents = changelogContents.replace(unreleasedHeader, latestTag)
-
-    await fs.writeFile(core.getInput('filePath'), changelogContents)
-
     core.setOutput('newTag', latestTag)
 
-    const changelogForNewRelease = changelogContents.substring(0, changelogContents.indexOf(previousTag))
+    changelogContents = changelogContents.replace(unreleasedHeader, latestTag)
+    await fs.writeFile(core.getInput('filePath'), changelogContents)
+
+    const changelogForNewRelease = changelogContents.substring(0, previousTag ? changelogContents.indexOf(previousTag) : changelogContents.length)
     core.setOutput('changelog', changelogForNewRelease)
   } catch (error) {
     core.setFailed(error.message)
