@@ -6126,6 +6126,8 @@ const main = async () => {
     const octokit = github.getOctokit(token)  
     const repo = github.context.repo
 
+    const prefix = core.getInput('prefix') || 'changelog'
+
     const changelogContents = await fs.readFile(core.getInput('filePath'), 'utf8')
 
     const previousTag = changelogContents
@@ -6147,7 +6149,7 @@ const main = async () => {
     const unreleasedContent = getUnreleasedChanges(changelogContents, previousTag)
     const commitsData = getChangelogCommitsData(unreleasedContent).map((commit) => ({
       ...commit,
-      released: comparisonBranchMessages.includes(`changelog: ${commit.message}`)
+      released: comparisonBranchMessages.includes(`${prefix}: ${commit.message}`)
     }))
 
     // only move commits in the comparison branch to the new tag's section
