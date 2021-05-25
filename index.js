@@ -32,7 +32,7 @@ const getChangelogCommitsData = (unreleasedContent) => {
       const url = line.split('[commit]')[1].replace(/[()]/g, '')
 
       return {
-        message: line.split(' ([commit]')[0],
+        message: line.split(' ([commit]')[0].replace('* ', ''),
         sha: url.split('commit/')[1]
       }
     })
@@ -48,14 +48,14 @@ const formatCommits = (commitsData, latestTag, released) => {
 
     const header = released ? latestTag : 'Unreleased'
 
-    return `## ${header}\n${formattedCommits}\n`
+    return `## ${header}\n${formattedCommits}`
   } else {
     return ''
   }
 }
 
 const formatChangelog = (commitsData) => {
-  const commits =  commitsData.filter((commit) => commit.released === released)
+  const commits =  commitsData.filter((commit) => commit.released)
   
   if (commits.length > 0) {
     return commits.map((commit) => `• ${commit.message}`).join('\n')
@@ -79,6 +79,9 @@ const main = async () => {
 
     const latestTag = createNewTag(previousTag)
 
+    const unreleasedContent = getUnreleasedChanges(changelogContents, previousTag)
+    let commitsData = getChangelogCommitsData(unreleasedContent)
+
     // see what commits went into the comparison branch
     const comparisonBranchCommits = await octokit.rest.repos.listCommits({
       ...repo,
@@ -86,22 +89,18 @@ const main = async () => {
       per_page: commitsData.length
     })
 
+    // mark as released if the sha exists in the comparison branch
     comparisonBranchSHAs = comparisonBranchCommits.data.map((commit) => commit.sha)
-
-    const unreleasedContent = getUnreleasedChanges(changelogContents, previousTag)
-    const commitsData = getChangelogCommitsData(unreleasedContent).map((commitData) => ({
-      ...commitData,
-      released: comparisonBranchSHAs.includes(commitData.sha)
-    }))
+    commitsData = commitsData.map((commit) => ({ ...commit, released: comparisonBranchSHAs.includes(commit.sha) }))
 
     // only move commits in the comparison branch to the new tag's section
-    await fs.writeFile(core.getInput('filePath'), changelogContents.replace(unreleasedContent, `
-      ${formatCommits(commitsData, latestTag, false)}
-      ${formatCommits(commitsData, latestTag, true)}
-    `))
+    await fs.writeFile(
+      core.getInput('filePath'),
+      changelogContents.replace(unreleasedContent, `${formatCommits(commitsData, latestTag, false)}${formatCommits(commitsData, latestTag, true)}`)
+    )
 
     const changelogForNewRelease = formatChangelog(commitsData)
-    core.info(changelogForNewRelease)
+    core.info(changelogForNewRelease || 'No new changes')
 
     core.setOutput('newTag', latestTag)
     core.setOutput('changelog', changelogForNewRelease)
