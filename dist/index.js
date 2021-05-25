@@ -6150,6 +6150,8 @@ const main = async () => {
       released: comparisonBranchSHAs.includes(commit.sha)
     }))
 
+    console.log(commitsData)
+
     // only move commits in the comparison branch to the new tag's section
     await fs.writeFile(
       core.getInput('filePath'),
@@ -6163,7 +6165,7 @@ const main = async () => {
 
     core.startGroup('Outputs')
     core.info(`newTag: ${latestTag}`)
-    core.info(`changelog: ${changelogForNewRelease || 'No new changes'}`)
+    core.info(`changelog:\n${changelogForNewRelease || 'No new changes'}`)
     core.endGroup()
   } catch (error) {
     core.setFailed(error.message)
