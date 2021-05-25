@@ -19,21 +19,20 @@ const getUnreleasedChanges = (changelogContents, previousTag) => {
     ? changelogContents.indexOf(previousTag)
     : changelogContents.length
 
-  return changelogContents
-    .substring(0, end)
-    .replace('## Unreleased', '')
+  return changelogContents.substring(0, end)
 }
 
 const getChangelogCommitsData = (unreleasedContent) => {
   return unreleasedContent
     .split('\n')
-    .filter((l) => Boolean(l))
+    .filter((l) => Boolean(l) && !l.startsWith('##'))
     .map((line) => {
       const url = line.split('[commit]')[1].replace(/[()]/g, '')
 
       return {
         message: line.split(' ([commit]')[0].replace('* ', ''),
-        sha: url.split('commit/')[1]
+        sha: url.split('commit/')[1],
+        url
       }
     })
 }
@@ -43,12 +42,12 @@ const formatCommits = (commitsData, latestTag, released) => {
 
   if (commits.length > 0) {
     const formattedCommits = commits
-      .map((commit) => `* ${commit.message} ([commit](${commit.sha}))`).
+      .map((commit) => `* ${commit.message} ([commit](${commit.url}))`).
       join('\n')
 
     const header = released ? latestTag : 'Unreleased'
 
-    return `## ${header}\n${formattedCommits}`
+    return `## ${header}\n${formattedCommits}\n`
   } else {
     return ''
   }
@@ -79,19 +78,20 @@ const main = async () => {
 
     const latestTag = createNewTag(previousTag)
 
-    const unreleasedContent = getUnreleasedChanges(changelogContents, previousTag)
-    let commitsData = getChangelogCommitsData(unreleasedContent)
-
     // see what commits went into the comparison branch
     const comparisonBranchCommits = await octokit.rest.repos.listCommits({
       ...repo,
-      sha: core.getInput('comparisonBranch'),
-      per_page: commitsData.length
+      sha: github.context.ref
     })
 
-    // mark as released if the sha exists in the comparison branch
     comparisonBranchSHAs = comparisonBranchCommits.data.map((commit) => commit.sha)
-    commitsData = commitsData.map((commit) => ({ ...commit, released: comparisonBranchSHAs.includes(commit.sha) }))
+
+    // mark as released if the sha exists in the comparison branch
+    const unreleasedContent = getUnreleasedChanges(changelogContents, previousTag)
+    const commitsData = getChangelogCommitsData(unreleasedContent).map((commit) => ({
+      ...commit,
+      released: comparisonBranchSHAs.includes(commit.sha)
+    }))
 
     // only move commits in the comparison branch to the new tag's section
     await fs.writeFile(
@@ -100,10 +100,14 @@ const main = async () => {
     )
 
     const changelogForNewRelease = formatChangelog(commitsData)
-    core.info(changelogForNewRelease || 'No new changes')
 
     core.setOutput('newTag', latestTag)
     core.setOutput('changelog', changelogForNewRelease)
+
+    core.startGroup('Outputs')
+    core.info(`newTag: ${latestTag}`)
+    core.info(`changelog: ${changelogForNewRelease || 'No new changes'}`)
+    core.endGroup()
   } catch (error) {
     core.setFailed(error.message)
   }
