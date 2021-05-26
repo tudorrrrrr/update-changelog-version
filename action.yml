@@ -1,14 +1,13 @@
 name: 'Update changelog version'
-description: 'Updates the changelog with the latest version and outputs commits in that release'
+description: 'Use calendar versioning to organise your changelog'
 inputs:
   token:
     description: 'GitHub token'
     required: true
   filePath:
     description: 'Path to your changelog'
-    required: true
   prefix:
-    description: 'What commits need to start with in order to be included in the changelog output'
+    description: 'What commits need to start with to be included in the changelog output'
 outputs:
   newTag:
     description: 'New tag for the release'
