@@ -6128,7 +6128,8 @@ const main = async () => {
 
     const prefix = core.getInput('prefix') || 'changelog'
 
-    const changelogContents = await fs.readFile(core.getInput('filePath'), 'utf8')
+    const filePath = core.getInput('filePath') || 'CHANGELOG.md'
+    const changelogContents = await fs.readFile(filePath, 'utf8')
 
     const previousTag = changelogContents
       .split('\n')
