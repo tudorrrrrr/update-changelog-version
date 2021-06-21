@@ -6059,6 +6059,8 @@ const core = __nccwpck_require__(186)
 const github = __nccwpck_require__(438)
 const fs = __nccwpck_require__(747).promises
 
+const prefix = core.getInput('prefix') || 'changelog'
+
 const createNewTag = (previousTag) => {
   if (!previousTag) return `${new Date().getFullYear()}.${new Date().getMonth() + 1}.1`
 
@@ -6120,13 +6122,15 @@ const formatChangelog = (commitsData) => {
   }
 }
 
+const processMessage = (message) => {
+  return message.replace(`${prefix}:`, '').trim().toLowerCase()
+}
+
 const main = async () => {
   try {
     const token = core.getInput('token')
     const octokit = github.getOctokit(token)  
     const repo = github.context.repo
-
-    const prefix = core.getInput('prefix') || 'changelog'
 
     const filePath = core.getInput('filePath') || 'CHANGELOG.md'
     const changelogContents = await fs.readFile(filePath, 'utf8')
@@ -6144,13 +6148,13 @@ const main = async () => {
       sha: github.context.ref
     })
 
-    comparisonBranchMessages = comparisonBranchCommits.data.map((commit) => commit.commit.message.replace(`${prefix}:`, '').trim())
+    comparisonBranchMessages = comparisonBranchCommits.data.map((commit) => processMessage(commit.commit.message))
 
     // mark as released if the sha exists in the comparison branch
     const unreleasedContent = getUnreleasedChanges(changelogContents, previousTag)
     const commitsData = getChangelogCommitsData(unreleasedContent).map((commit) => ({
       ...commit,
-      released: comparisonBranchMessages.includes(commit.message.replace(`${prefix}:`, '').trim())
+      released: comparisonBranchMessages.includes(processMessage(commit.message))
     }))
 
     // only move commits in the comparison branch to the new tag's section
