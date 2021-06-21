@@ -87,13 +87,13 @@ const main = async () => {
       sha: github.context.ref
     })
 
-    comparisonBranchMessages = comparisonBranchCommits.data.map((commit) => commit.commit.message)
+    comparisonBranchMessages = comparisonBranchCommits.data.map((commit) => commit.commit.message.replace(`${prefix}:`, '').trim())
 
     // mark as released if the sha exists in the comparison branch
     const unreleasedContent = getUnreleasedChanges(changelogContents, previousTag)
     const commitsData = getChangelogCommitsData(unreleasedContent).map((commit) => ({
       ...commit,
-      released: comparisonBranchMessages.includes(`${prefix}: ${commit.message}`)
+      released: comparisonBranchMessages.includes(commit.message.replace(`${prefix}:`, '').trim())
     }))
 
     // only move commits in the comparison branch to the new tag's section
