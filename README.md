@@ -10,6 +10,7 @@ Using the [push to changelog action](https://github.com/blackbullion/push-to-cha
 | ----------- | ----------- | -----------
 | token       | yes         | Your GitHub token (i.e. `${{ secrets.GITHUB_TOKEN }}`)
 | filePath    | no          | Path to your changelog. Default: `CHANGELOG.md`
+| prefix      | no          | What commits need to start with to be added to the changelog. Default: `changelog`
 
 ## Outputs
 

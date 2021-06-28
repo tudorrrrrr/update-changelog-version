@@ -6,6 +6,8 @@ inputs:
     required: true
   filePath:
     description: 'Path to your changelog'
+  prefix:
+    description: 'What commits need to start with to be included in the changelog output'
 outputs:
   newTag:
     description: 'New tag for the release'
