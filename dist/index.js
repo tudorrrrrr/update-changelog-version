@@ -6483,6 +6483,9 @@ const main = async () => {
 
     // mark as released if the sha exists in the comparison branch
     const unreleasedContent = getUnreleasedChanges(changelogContents, previousTag)
+
+    core.info(`Raw unreleased markdown: ${unreleasedContent}`)
+
     const commitsData = getChangelogCommitsData(unreleasedContent).map((commit) => ({
       ...commit,
       released: comparisonBranchMessages.includes(processMessage(commit.message))
