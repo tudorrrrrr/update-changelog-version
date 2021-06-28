@@ -3,8 +3,6 @@ const github = require('@actions/github')
 const fs = require('fs').promises
 const capitalize = require('lodash.capitalize')
 
-const prefix = core.getInput('prefix') || 'changelog'
-
 const createNewTag = (previousTag) => {
   if (!previousTag) return `${new Date().getFullYear()}.${new Date().getMonth() + 1}.1`
 
@@ -25,19 +23,30 @@ const getUnreleasedChanges = (changelogContents, previousTag) => {
   return changelogContents.substring(0, end)
 }
 
-const getChangelogCommitsData = (unreleasedContent) => {
-  return unreleasedContent
-    .split('\n')
-    .filter((l) => Boolean(l) && !l.startsWith('##'))
-    .map((line) => {
+const getChangelogCommitsData = async (unreleasedContent, octokit, repo) => {
+  const processedContent = unreleasedContent.split('\n').filter((l) => Boolean(l) && !l.startsWith('##'))
+
+  const data = await Promise.all(
+    processedContent.map(async (line) => {
       const url = line.split('[commit]')[1].replace(/[()]/g, '')
+      const sha = url.split('commit/')[1]
+
+      const commit = await octokit.rest.repos.compareCommits({
+        ...repo,
+        base: github.context.ref,
+        head: sha
+      })
 
       return {
         message: line.split(' ([commit]')[0].replace('* ', ''),
-        sha: url.split('commit/')[1],
-        url
+        sha,
+        url,
+        released: ['behind', 'identical'].includes(commit.data.status) 
       }
     })
+  )
+
+  return data
 }
 
 const formatCommits = (commitsData, latestTag, released) => {
@@ -45,8 +54,8 @@ const formatCommits = (commitsData, latestTag, released) => {
 
   if (commits.length > 0) {
     const formattedCommits = commits
-      .map((commit) => `* ${commit.message} ([commit](${commit.url}))`).
-      join('\n')
+      .map((commit) => `* ${commit.message} ([commit](${commit.url}))`)
+      .join('\n')
 
     const header = released ? latestTag : 'Unreleased'
 
@@ -60,15 +69,10 @@ const formatChangelog = (commitsData) => {
   const commits =  commitsData.filter((commit) => commit.released)
   
   if (commits.length > 0) {
-    return commits.map((commit) => `• ${commit.message}`).join('\n')
+    return commits.map((commit) => `• ${capitalize(commit.message)}`).join('\n')
   } else {
     return ''
   }
-}
-
-const processMessage = (message) => {
-  message = message.split('\n')[0]
-  return capitalize(message.replace(`${prefix}:`, '').trim())
 }
 
 const main = async () => {
@@ -85,29 +89,15 @@ const main = async () => {
       .filter((l) => Boolean(l))
       .find((l) => l.startsWith('## 20')) // works until the 22nd century
 
-    const latestTag = createNewTag(previousTag)
-
-    // see what commits went into the comparison branch
-    const comparisonBranchCommits = await octokit.rest.repos.listCommits({
-      ...repo,
-      sha: github.context.ref
-    })
-
-    comparisonBranchMessages = comparisonBranchCommits.data.map((commit) => processMessage(commit.commit.message))
-
-    // mark as released if the sha exists in the comparison branch
     const unreleasedContent = getUnreleasedChanges(changelogContents, previousTag)
 
-    core.info(`Raw unreleased markdown:\n${unreleasedContent}`)
+    const latestTag = createNewTag(previousTag)
 
-    const commitsData = getChangelogCommitsData(unreleasedContent).map((commit) => ({
-      ...commit,
-      released: comparisonBranchMessages.includes(processMessage(commit.message))
-    }))
+    const commitsData = await getChangelogCommitsData(unreleasedContent, octokit, repo)
 
     // only move commits in the comparison branch to the new tag's section
     await fs.writeFile(
-      core.getInput('filePath'),
+      filePath,
       changelogContents.replace(unreleasedContent, `${formatCommits(commitsData, latestTag, false)}${formatCommits(commitsData, latestTag, true)}`)
     )
 
