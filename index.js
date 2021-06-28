@@ -1,6 +1,7 @@
 const core = require('@actions/core')
 const github = require('@actions/github')
 const fs = require('fs').promises
+const capitalize = require('lodash.capitalize')
 
 const prefix = core.getInput('prefix') || 'changelog'
 
@@ -67,7 +68,7 @@ const formatChangelog = (commitsData) => {
 
 const processMessage = (message) => {
   message = message.split('\n')[0]
-  return message.replace(`${prefix}:`, '').trim().toLowerCase()
+  return capitalize(message.replace(`${prefix}:`, '').trim())
 }
 
 const main = async () => {
