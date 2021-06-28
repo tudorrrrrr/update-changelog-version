@@ -6389,6 +6389,8 @@ const github = __nccwpck_require__(438)
 const fs = __nccwpck_require__(747).promises
 const capitalize = __nccwpck_require__(340)
 
+const prefix = core.getInput('prefix') || 'changelog'
+
 const createNewTag = (previousTag) => {
   if (!previousTag) return `${new Date().getFullYear()}.${new Date().getMonth() + 1}.1`
 
@@ -6409,30 +6411,39 @@ const getUnreleasedChanges = (changelogContents, previousTag) => {
   return changelogContents.substring(0, end)
 }
 
-const getChangelogCommitsData = async (unreleasedContent, octokit, repo) => {
-  const processedContent = unreleasedContent.split('\n').filter((l) => Boolean(l) && !l.startsWith('##'))
-
-  const data = await Promise.all(
-    processedContent.map(async (line) => {
+const getChangelogCommitsData = (unreleasedContent) => {
+  return unreleasedContent
+    .split('\n')
+    .filter((l) => Boolean(l) && !l.startsWith('##'))
+    .map((line) => {
       const url = line.split('[commit]')[1].replace(/[()]/g, '')
-      const sha = url.split('commit/')[1]
-
-      const commit = await octokit.rest.repos.compareCommits({
-        ...repo,
-        base: github.context.ref,
-        head: sha
-      })
 
       return {
         message: line.split(' ([commit]')[0].replace('* ', ''),
-        sha,
-        url,
-        released: ['behind', 'identical'].includes(commit.data.status) 
+        sha: url.split('commit/')[1],
+        url
       }
     })
-  )
+}
 
-  return data
+const getCommitsTimeFrame = async (unreleasedContent, octokit, repo) => {
+  let data = getChangelogCommitsData(unreleasedContent)
+
+  data = await Promise.all(data.map(async (commit) => {
+    const res = await octokit.rest.git.getCommit({
+      ...repo,
+      commit_sha: commit.sha
+    })
+
+    return {
+      ...commit,
+      date: res.data.author.date
+    }
+  }))
+
+  data = data.sort((a, b) => new Date(a.date) - new Date(b.date))
+
+  return [data[0].date, new Date().toISOString()]
 }
 
 const formatCommits = (commitsData, latestTag, released) => {
@@ -6461,6 +6472,53 @@ const formatChangelog = (commitsData) => {
   }
 }
 
+const processMessage = (message) => {
+  message = message.split('\n')[0]
+  return capitalize(message.replace(`${prefix}:`, '').trim())
+}
+
+const listCommits = async (unreleasedContent, octokit, repo) => {
+  const [since, until] = await getCommitsTimeFrame(unreleasedContent, octokit, repo)
+
+  const commits = []
+  let done = false
+  let page = 0
+
+  do {
+    const comparisonBranchCommits = await octokit.rest.repos.listCommits({
+      ...repo,
+      since,
+      until,
+      sha: github.context.ref,
+      per_page: 100,
+      page
+    })
+
+    if (comparisonBranchCommits.data.length === 0) {
+      done = true
+    } else {
+      commits.push(...comparisonBranchCommits.data)
+      page++
+    }
+  } while(!done)
+
+  return commits
+}
+
+const getCommitReleased = async (octokit, repo, comparisonBranchMessages, commit) => {
+  let released = comparisonBranchMessages.includes(processMessage(commit.message))
+  if (released) return true
+
+  // changelog message probably changed, check if it's in the branch
+  const res = await octokit.rest.repos.compareCommits({
+    ...repo,
+    base: github.context.ref,
+    head: commit.sha
+  })
+
+  return ['behind', 'identical'].includes(res.data.status)
+}
+
 const main = async () => {
   try {
     const token = core.getInput('token')
@@ -6479,13 +6537,18 @@ const main = async () => {
 
     const latestTag = createNewTag(previousTag)
 
-    const commitsData = await getChangelogCommitsData(unreleasedContent, octokit, repo)
+    // see what commits went into the comparison branch
+    const comparisonBranchCommits = await listCommits(unreleasedContent, octokit, repo)
+    const comparisonBranchMessages = comparisonBranchCommits.map((commit) => processMessage(commit.commit.message))
+
+    const commitsData = await Promise.all(getChangelogCommitsData(unreleasedContent).map(async (commit) => ({
+      ...commit,
+      released: await getCommitReleased(octokit, repo, comparisonBranchMessages, commit)
+    })))
 
     // only move commits in the comparison branch to the new tag's section
-    await fs.writeFile(
-      filePath,
-      changelogContents.replace(unreleasedContent, `${formatCommits(commitsData, latestTag, false)}${formatCommits(commitsData, latestTag, true)}`)
-    )
+    const newContents = changelogContents.replace(unreleasedContent, `${formatCommits(commitsData, latestTag, false)}${formatCommits(commitsData, latestTag, true)}`)
+    await fs.writeFile(filePath, newContents)
 
     const changelogForNewRelease = formatChangelog(commitsData)
 
