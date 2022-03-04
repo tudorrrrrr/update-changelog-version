@@ -57,7 +57,7 @@ const getCommitsTimeFrame = async (unreleasedContent, octokit, repo) => {
 
   data = data.sort((a, b) => new Date(a.date) - new Date(b.date))
 
-  return [data[0].date, new Date().toISOString()]
+  return [data[0]?.date ?? new Date().toISOString(), new Date().toISOString()]
 }
 
 const formatCommits = (commitsData, latestTag, released) => {
