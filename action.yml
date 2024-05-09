@@ -14,5 +14,5 @@ outputs:
   changelog:
     description: 'The changes for the newest release'
 runs:
-  using: 'node16'
+  using: 'node20'
   main: 'dist/index.js'
